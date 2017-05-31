@@ -114,9 +114,8 @@ def add_task_build_common(android_abis, default_abi=None):
 def _hook_pre_images(task, args):
     # cleanup
     dragon.exec_cmd(cwd=dragon.OUT_DIR, cmd="rm -rf images")
-    manifest_dir = os.path.join(dragon.FINAL_DIR, "etc")
-    dragon.makedirs(manifest_dir)
-    dragon.exec_cmd(cwd=manifest_dir, cmd="touch manifest.xml")
+    manifest_path = os.path.join(dragon.OUT_DIR, "manifest.xml")
+    dragon.gen_manifest_xml(manifest_path)
     task.call_base_pre_hook(args)
 
 def _make_hook_images(symbols_path, apk_dir, apk_files, abis):
