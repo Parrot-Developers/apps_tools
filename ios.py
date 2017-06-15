@@ -237,9 +237,7 @@ def _make_hook_images(calldir, archive_path, scheme,
         # build.prop
         build_prop_file = os.path.join(dragon.OUT_DIR, "staging", "etc",
                                        "build.prop")
-        build_prop_dir = os.path.join(dragon.FINAL_DIR, "etc")
-        dragon.makedirs(build_prop_dir)
-        dragon.exec_cmd(cwd=build_prop_dir, cmd="cp %s ." % build_prop_file)
+        dragon.exec_cmd(cwd=dragon.OUT_DIR, cmd="cp %s ." % build_prop_file)
 
         # next hooks
         task.call_base_exec_hook(args)

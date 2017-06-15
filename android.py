@@ -139,9 +139,7 @@ def _make_hook_images(symbols_path, apk_dir, apk_files, abis):
         # build.prop
         build_prop_file = os.path.join(dragon.OUT_DIR, abis[-1],
                                        "staging", "etc", "build.prop")
-        build_prop_dir = os.path.join(dragon.FINAL_DIR, "etc")
-        dragon.makedirs(build_prop_dir)
-        dragon.exec_cmd(cwd=build_prop_dir, cmd="cp %s ." % build_prop_file)
+        dragon.exec_cmd(cwd=dragon.OUT_DIR, cmd="cp %s ." % build_prop_file)
 
         # global.config
         global_config_file = os.path.join(dragon.OUT_DIR, abis[-1],
