@@ -2,6 +2,15 @@
 import os, logging
 import dragon
 
+def setup_argparse(parser):
+    parser.add_argument("--abis",
+                        dest="android_abis",
+                        nargs="+",
+                        choices=("armeabi", "armeabi-v7a", "arm64-v8a",
+                                 "mips", "mips64",
+                                 "x86", "x86_64"),
+                        help="Select which android ABIS to build")
+
 def _setup_android_abi(task, args, abi):
     task.call_base_pre_hook(args)
     task.extra_env["ANDROID_ABI"] = abi
@@ -51,6 +60,8 @@ def _ndk_build(calldir, module, abis, extra_args, ignore_failure=False):
 
 def add_ndk_build_task(calldir="", module="", abis=[], extra_args=[],
                        name="", desc="", subtasks=[], ignore_failure=False):
+    if dragon.OPTIONS.android_abis:
+        abis = dragon.OPTIONS.android_abis
     dragon.add_meta_task(
         name=name,
         desc=desc,
@@ -83,6 +94,8 @@ def add_gradle_task(calldir, target="", extra_args=[],
     )
 
 def add_task_build_common(android_abis, default_abi=None):
+    if dragon.OPTIONS.android_abis:
+        android_abis = dragon.OPTIONS.android_abis
     # Register all abi/arch\
     for abi in android_abis:
         _add_android_abi(abi)
@@ -152,13 +165,16 @@ def _make_hook_images(symbols_path, apk_dir, apk_files, abis):
 
 def add_release_task(symbols_path, apk_dir, apk_files, abis):
 
+    if dragon.OPTIONS.android_abis:
+        abis = dragon.OPTIONS.android_abis
+
     dragon.override_meta_task(
         name="images-all",
         prehook=_hook_pre_images,
         exechook=_make_hook_images(symbols_path,
-                                     apk_dir,
-                                     apk_files,
-                                     abis)
+                                   apk_dir,
+                                   apk_files,
+                                   abis)
     )
 
     dragon.override_meta_task(
