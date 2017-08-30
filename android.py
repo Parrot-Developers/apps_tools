@@ -1,5 +1,7 @@
 # base to build an Android application
 import os, logging
+import re
+import string
 import dragon
 
 def setup_argparse(parser):
@@ -14,6 +16,39 @@ def setup_argparse(parser):
 def _setup_android_abi(task, args, abi):
     task.call_base_pre_hook(args)
     task.extra_env["ANDROID_ABI"] = abi
+
+def _get_version_code_from_name(version_name):
+    if version_name == "0.0.0" or version_name.startswith("0.0.0-"):
+        return "0"
+    if not re.match(r"[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}(-(alpha|beta|rc)+[0-9]{0,2})?$",
+                    version_name, flags=re.IGNORECASE):
+        raise ValueError("Bad version name : " + version_name)
+
+    try:
+        (version, variant) = version_name.split("-")
+    except ValueError:
+        version = version_name
+        variant = "release"
+    (major, minor, rev) = (int(x) for x in version.split("."))
+
+    try:
+        variant_num = int(variant.strip(string.ascii_letters))
+    except ValueError:
+        variant_num = 0
+    variant_name = variant.strip(string.digits)
+
+    variant_codes = { "alpha": 0,
+                      "beta": 1,
+                      "rc": 2,
+                      "release": 3,
+                      };
+    try:
+        variant_code = variant_codes[variant_name]
+    except KeyError:
+        variant_code = 0
+
+    return "{:02d}{:02d}{:02d}{:01d}{:02d}".format(major, minor, rev,
+                                                   variant_code, variant_num)
 
 # Register a task to build android common code for a specific abi/arch
 def _add_android_abi(abi):
@@ -72,13 +107,20 @@ def add_ndk_build_task(calldir="", module="", abis=[], extra_args=[],
     )
 
 def _gradle(calldir, extra_args):
+    version = dragon.PARROT_BUILD_PROP_VERSION
+    vname, _, suffix = version.partition('-')
+    vcode = _get_version_code_from_name(version)
+
     cmd = "./gradlew"
     if os.environ.get("MOVE_APPSDATA_IN_OUTDIR"):
         cmd +=" --project-cache-dir %s" % os.path.join(dragon.OUT_DIR,
                                                        ".gradle")
     cmd +=" -PalchemyOutRoot=%s" % dragon.OUT_ROOT_DIR
     cmd +=" -PalchemyOut=%s" % dragon.OUT_DIR
-    cmd +=" -PalchemyProduct=%s " % dragon.PRODUCT
+    cmd +=" -PalchemyProduct=%s" % dragon.PRODUCT
+    cmd +=" -PappVersionName=%s" % vname
+    cmd +=" -PappVersionNameSuffix=-%s" % suffix
+    cmd +=" -PappVersionCode=%s " % vcode
     cmd +=" ".join(extra_args)
     dragon.exec_cmd(cmd, cwd=calldir)
 

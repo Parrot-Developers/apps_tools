@@ -6,6 +6,39 @@ import re
 import tempfile
 import tarfile
 
+def _get_version_code_from_name(version_name):
+    if version_name == "0.0.0" or version_name.startswith("0.0.0-"):
+        return "0"
+    if not re.match(r"[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}(-(alpha|beta|rc)+[0-9]{0,2})?$",
+                    version_name, flags=re.IGNORECASE):
+        raise ValueError("Bad version name : " + version_name)
+
+    try:
+        (version, variant) = version_name.split("-")
+    except ValueError:
+        version = version_name
+        variant = "release"
+    (major, minor, rev) = (int(x) for x in version.split("."))
+
+    try:
+        variant_num = int(variant.strip(string.ascii_letters))
+    except ValueError:
+        variant_num = 0
+    variant_name = variant.strip(string.digits)
+
+    variant_codes = { "alpha": 0,
+                      "beta": 1,
+                      "rc": 2,
+                      "release": 3,
+                      };
+    try:
+        variant_code = variant_codes[variant_name]
+    except KeyError:
+        variant_code = 0
+
+    return "{:02d}{:02d}{:02d}.{:01d}.{:02d}".format(major, minor, rev,
+                                                     variant_code, variant_num)
+
 def _set_product():
     with open(os.path.join(dragon.OUT_ROOT_DIR, "product.xcconfig"), "w") as f:
         f.write("ALCHEMY_PRODUCT = %s\n" % dragon.PRODUCT)
@@ -41,6 +74,9 @@ def add_xctool_task(calldir="", workspace="", configuration="",
     )
 
 def _xcodebuild(calldir, workspace, configuration, scheme, action, extra_args):
+    version = dragon.PARROT_BUILD_PROP_VERSION
+    vname, _, _ = version.partition('-')
+    vcode = _get_version_code_from_name(version)
     cmd = "xcodebuild"
     if (dragon.VARIANT == "ios_sim"):
         cmd += " -sdk iphonesimulator -arch x86_64"
@@ -57,7 +93,10 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, extra_args):
     cmd += " %s" % action
     cmd += " ALCHEMY_OUT=%s" % dragon.OUT_DIR
     cmd += " ALCHEMY_OUT_ROOT=%s" % dragon.OUT_ROOT_DIR
-    cmd += " ALCHEMY_PRODUCT=%s " % dragon.PRODUCT
+    cmd += " ALCHEMY_PRODUCT=%s" % dragon.PRODUCT
+    cmd += " APP_VERSION_SHORT=%s" % vname
+    cmd += " APP_VERSION=%s" % version
+    cmd += " APP_BUILD=%s" % vcode
     cmd += " ".join(extra_args)
     if not dragon.OPTIONS.verbose and shutil.which("xcpretty"):
         cmd += " | xcpretty && exit ${PIPESTATUS[0]}"
