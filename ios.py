@@ -3,6 +3,7 @@ import os
 import dragon
 import shutil
 import re
+import string
 import tempfile
 import tarfile
 
