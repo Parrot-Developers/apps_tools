@@ -119,7 +119,8 @@ def _gradle(calldir, extra_args):
     cmd +=" -PalchemyOut=%s" % dragon.OUT_DIR
     cmd +=" -PalchemyProduct=%s" % dragon.PRODUCT
     cmd +=" -PappVersionName=%s" % vname
-    cmd +=" -PappVersionNameSuffix=-%s" % suffix
+    if suffix:
+        cmd +=" -PappVersionNameSuffix=-%s" % suffix
     cmd +=" -PappVersionCode=%s " % vcode
     cmd +=" ".join(extra_args)
     dragon.exec_cmd(cmd, cwd=calldir)
