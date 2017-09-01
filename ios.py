@@ -97,7 +97,7 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, extra_args):
     cmd += " ALCHEMY_PRODUCT=%s" % dragon.PRODUCT
     cmd += " APP_VERSION_SHORT=%s" % vname
     cmd += " APP_VERSION=%s" % version
-    cmd += " APP_BUILD=%s" % vcode
+    cmd += " APP_BUILD=%s " % vcode
     cmd += " ".join(extra_args)
     if not dragon.OPTIONS.verbose and shutil.which("xcpretty"):
         cmd += " | xcpretty && exit ${PIPESTATUS[0]}"
