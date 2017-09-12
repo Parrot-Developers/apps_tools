@@ -227,10 +227,30 @@ def _hook_pre_images(task, args):
     dragon.gen_manifest_xml(manifest_path)
     task.call_base_pre_hook(args)
 
-def _make_hook_images(calldir, archive_path, scheme,
+def _make_hook_images(calldir, archives, scheme,
                      inhouse_app_prefix=None, inhouse_team_id=None,
                      appstore_app_prefix=None, appstore_team_id=None):
     def _hook_images(task, args):
+
+        images_dir = os.path.join(dragon.OUT_DIR, "images")
+        dragon.makedirs(images_dir)
+
+        for archive_path in archives:
+            # Compress .xcarchive
+            archive_dir = os.path.dirname(archive_path)
+            archive_name = os.path.basename(archive_path)
+            tarname = os.path.join(
+                images_dir,
+                "{}.tar.gz".format(os.path.basename(archive_path)))
+            cwd = os.getcwd()
+            os.chdir(archive_dir)
+            tar = tarfile.open(tarname, "w:gz")
+            tar.add(archive_name)
+            tar.close()
+            os.chdir(cwd)
+
+        # generate ipas only for the first configuration
+        archive_path = archives[0]
         entitlements_path = os.path.join(archive_path, "Products",
                                          "Applications",
                                          "{}.app".format(scheme),
@@ -249,21 +269,6 @@ def _make_hook_images(calldir, archive_path, scheme,
                                         appstore_app_prefix,
                                         appstore_team_id,
                                         inhouse=False)
-
-        images_dir = os.path.join(dragon.OUT_DIR, "images")
-        dragon.makedirs(images_dir)
-        # Compress .xcarchive
-        archive_dir = os.path.dirname(archive_path)
-        archive_name = os.path.basename(archive_path)
-        tarname = os.path.join(
-            images_dir,
-            "{}.tar.gz".format(os.path.basename(archive_path)))
-        cwd = os.getcwd()
-        os.chdir(archive_dir)
-        tar = tarfile.open(tarname, "w:gz")
-        tar.add(archive_name)
-        tar.close()
-        os.chdir(cwd)
         # Link .ipa
         if inhouse_path:
             dragon.exec_cmd(cwd=images_dir,
@@ -283,46 +288,64 @@ def _make_hook_images(calldir, archive_path, scheme,
         task.call_base_exec_hook(args)
     return _hook_images
 
+def _make_rm_previous_archive(scheme):
+    def _rm_previous_archive(task, args):
+        confname = task.name.split('-')[-1]
+        archname = os.path.join(dragon.OUT_DIR,
+                                "xcodeArchives",
+                                "{}-{}.xcarchive".format(scheme, confname))
+        dragon.exec_cmd('rm -rf {}'.format(archname))
+    return _rm_previous_archive
+
 def add_release_task(calldir="", workspace="", configuration="", scheme="",
                      extra_args=[],
                      inhouse_app_prefix=None, inhouse_team_id=None,
                      appstore_app_prefix=None, appstore_team_id=None):
-    archive_path = os.path.join(
-        dragon.OUT_DIR,
-        "xcodeArchives",
-        "{}-{}".format(scheme, configuration))
 
-    _args = ["-archivePath {}".format(archive_path)]
-    _args.extend(extra_args)
-    archive_path += ".xcarchive"
+    config_list = [configuration] if isinstance(configuration, str) else configuration
+    subtasks = []
+    archives = []
 
-    add_xcodebuild_task(
-        name="build-archive",
-        desc="build archive for release",
-        subtasks=["build-common"],
-        prehook=lambda task, args: dragon.exec_cmd(
-            cmd="rm -rf {}".format(archive_path)),
-        calldir=calldir,
-        workspace=workspace,
-        configuration=configuration,
-        scheme=scheme,
-        action="archive",
-        extra_args=_args
-    )
+    for cfg in config_list:
+        archive_path = os.path.join(
+            dragon.OUT_DIR,
+            "xcodeArchives",
+            "{}-{}".format(scheme, cfg))
+
+        _args = ["-archivePath {}".format(archive_path)]
+        _args.extend(extra_args)
+        archive_path += ".xcarchive"
+        archives.append(archive_path)
+
+        taskname = "build-archive-{}".format(cfg)
+        subtasks.append(taskname)
+
+        lambdacmd = "rm -rf {}".format(archive_path)
+
+        add_xcodebuild_task(
+            name=taskname,
+            desc="build archive {} for release".format(cfg),
+            subtasks=["build-common"],
+            prehook=_make_rm_previous_archive(scheme),
+            calldir=calldir,
+            workspace=workspace,
+            configuration=cfg,
+            scheme=scheme,
+            action="archive",
+            extra_args=_args
+        )
 
     dragon.override_meta_task(
         name="images-all",
         prehook=_hook_pre_images,
-        exechook=_make_hook_images(calldir, archive_path, scheme,
+        exechook=_make_hook_images(calldir, archives, scheme,
                                    inhouse_app_prefix, inhouse_team_id,
                                    appstore_app_prefix, appstore_team_id)
     )
 
+    subtasks.extend(["images-all", "gen-release-archive"])
+
     dragon.override_meta_task(
         name="release",
-        subtasks=[
-            "build-archive",
-            "images-all",
-            "gen-release-archive"
-        ]
+        subtasks=subtasks
     )
