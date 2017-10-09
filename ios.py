@@ -6,6 +6,7 @@ import re
 import string
 import tempfile
 import tarfile
+import collections
 
 def _get_version_code_from_name(version_name):
     if version_name == "0.0.0" or version_name.startswith("0.0.0-"):
@@ -74,7 +75,7 @@ def add_xctool_task(calldir="", workspace="", configuration="",
                                             extra_args)
     )
 
-def _xcodebuild(calldir, workspace, configuration, scheme, action, extra_args):
+def _xcodebuild(calldir, workspace, configuration, scheme, action, bundle_id, extra_args):
     version = dragon.PARROT_BUILD_PROP_VERSION
     vname, _, _ = version.partition('-')
     vcode = _get_version_code_from_name(version)
@@ -82,7 +83,7 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, extra_args):
     if (dragon.VARIANT == "ios_sim"):
         cmd += " -sdk iphonesimulator -arch x86_64"
     else:
-        cmd += " -sdk iphoneos "
+        cmd += " -sdk iphoneos"
     if workspace.endswith("xcworkspace"):
         cmd += " -workspace %s" % workspace
     else:
@@ -95,6 +96,8 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, extra_args):
     cmd += " ALCHEMY_OUT=%s" % dragon.OUT_DIR
     cmd += " ALCHEMY_OUT_ROOT=%s" % dragon.OUT_ROOT_DIR
     cmd += " ALCHEMY_PRODUCT=%s" % dragon.PRODUCT
+    if bundle_id:
+        cmd += " PRODUCT_BUNDLE_IDENTIFIER=%s" % bundle_id
     cmd += " APP_VERSION_SHORT=%s" % vname
     cmd += " APP_VERSION=%s" % version
     cmd += " APP_BUILD=%s " % vcode
@@ -104,7 +107,7 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, extra_args):
     dragon.exec_cmd(cmd, cwd=calldir)
 
 def add_xcodebuild_task(calldir="", workspace="", configuration="",
-                        scheme="", action="", extra_args=[],
+                        scheme="", action="", bundle_id=None, extra_args=[],
                         name="", desc="", subtasks=[], prehook=None):
     dragon.add_meta_task(
         name=name,
@@ -113,7 +116,7 @@ def add_xcodebuild_task(calldir="", workspace="", configuration="",
         prehook=prehook,
         posthook=lambda task, args: _xcodebuild(calldir, workspace,
                                                 configuration, scheme,
-                                                action, extra_args)
+                                                action, bundle_id, extra_args)
     )
 
 def _jazzy(calldir, workspace, scheme, extra_args):
@@ -164,6 +167,11 @@ _inhouse_plist_template="""
     <string>enterprise</string>
     <key>teamID</key>
     <string>{}</string>
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>{}</key>
+        <string>{}</string>
+    </dict>
     <key>compileBitcode</key>
     <true/>
 </dict>
@@ -179,45 +187,50 @@ _release_plist_template="""
     <string>app-store</string>
     <key>teamID</key>
     <string>{}</string>
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>{}</key>
+        <string>{}</string>
+    </dict>
 </dict>
 </plist>
 """
 
-def _create_export_plist(team_id, inhouse=True):
+def _create_export_plist(signing_infos, bundle_id, inhouse=True):
     plist_name = os.path.join(dragon.OUT_DIR, "export.plist")
     with open(plist_name, "w") as f:
         if inhouse:
             template = _inhouse_plist_template
         else:
             template = _release_plist_template
-        f.write(template.format(team_id))
+        f.write(template.format(signing_infos.team_id, bundle_id, signing_infos.profile))
     return plist_name
 
-def _replace_app_prefix_in_entitlements(entitlements_path, app_prefix):
+def _replace_app_prefix_in_entitlements(entitlements_path, signing_infos):
     fh, tmp_path = tempfile.mkstemp()
     with open(tmp_path,"w") as f, open(entitlements_path) as ent:
         for l in ent:
             f.write(re.sub(r'(.*<string)>[A-Z0-9]{10}(.com.parrot)',
-                           r'\1>{}\2'.format(app_prefix),
+                           r'\1>{}\2'.format(signing_infos.app_prefix),
                            l))
     os.close(fh)
     os.remove(entitlements_path)
     shutil.move(tmp_path, entitlements_path)
 
-def _export_archive(dirpath, archive_path, scheme, entitlements_path,
-                    app_prefix, team_id,
+def _export_archive(dirpath, archive_path, app, entitlements_path,
                     inhouse=True):
-    if app_prefix is None or team_id is None:
+    signing_infos = app.inhouse_infos if inhouse else app.appstore_infos
+    if signing_infos is None:
         return None
 
-    export_plist = _create_export_plist(team_id, inhouse=inhouse)
-    _replace_app_prefix_in_entitlements(entitlements_path, app_prefix)
+    export_plist = _create_export_plist(signing_infos, app.bundle_id, inhouse=inhouse)
+    _replace_app_prefix_in_entitlements(entitlements_path, signing_infos)
     ipa_path = os.path.join(dragon.OUT_DIR, "xcodeApps",
                                 "inhouse" if inhouse else "appstore")
     cmd = "xcodebuild -exportArchive -archivePath {} -exportOptionsPlist {}" \
           " -exportPath {}".format(archive_path, export_plist, ipa_path)
     dragon.exec_cmd(cwd=dirpath, cmd=cmd)
-    return "{}/{}.ipa".format(ipa_path, scheme)
+    return "{}/{}.ipa".format(ipa_path, app.scheme)
 
 def _hook_pre_images(task, args):
     # cleanup
@@ -227,15 +240,37 @@ def _hook_pre_images(task, args):
     dragon.gen_manifest_xml(manifest_path)
     task.call_base_pre_hook(args)
 
-def _make_hook_images(calldir, archives, scheme,
-                     inhouse_app_prefix=None, inhouse_team_id=None,
-                     appstore_app_prefix=None, appstore_team_id=None):
+
+SignatureInfos = collections.namedtuple('SignatureInfos', ['app_prefix', 'team_id', 'profile'])
+
+class App:
+    def __init__(self, scheme, configuration, bundle_id, args=[], inhouse_infos=None, appstore_infos=None):
+        self.configuration = configuration
+        self.scheme = scheme
+        self.bundle_id = bundle_id
+        self.args = args
+        self.inhouse_infos = inhouse_infos
+        self.appstore_infos = appstore_infos
+
+    def _archivePath(self, out, skipExt=False):
+        path = os.path.join(out, "xcodeArchives", "{}-{}".format(self.scheme, self.configuration))
+        if skipExt:
+            return path
+        return "{}{}".format(path, ".xcarchive")
+
+    def _taskName(self):
+        return "build-archive-{}-{}".format(self.scheme, self.configuration)
+    def _taskDesc(self):
+        return "build archive {}-{} for release".format(self.scheme, self.configuration)
+
+def _make_hook_images(calldir, apps):
     def _hook_images(task, args):
 
         images_dir = os.path.join(dragon.OUT_DIR, "images")
         dragon.makedirs(images_dir)
 
-        for archive_path in archives:
+        for app in apps:
+            archive_path = app._archivePath(dragon.OUT_DIR)
             # Compress .xcarchive
             archive_dir = os.path.dirname(archive_path)
             archive_name = os.path.basename(archive_path)
@@ -249,35 +284,29 @@ def _make_hook_images(calldir, archives, scheme,
             tar.close()
             os.chdir(cwd)
 
-        # generate ipas only for the first configuration
-        archive_path = archives[0]
-        entitlements_path = os.path.join(archive_path, "Products",
-                                         "Applications",
-                                         "{}.app".format(scheme),
-                                         "archived-expanded-entitlements.xcent")
-        inhouse_path = _export_archive(calldir,
-                                       archive_path,
-                                       scheme,
-                                       entitlements_path,
-                                       inhouse_app_prefix,
-                                       inhouse_team_id,
-                                       inhouse=True)
-        appstore_path = _export_archive(calldir,
-                                        archive_path,
-                                        scheme,
-                                        entitlements_path,
-                                        appstore_app_prefix,
-                                        appstore_team_id,
-                                        inhouse=False)
-        # Link .ipa
-        if inhouse_path:
-            dragon.exec_cmd(cwd=images_dir,
-                            cmd="ln -s {} {}-inhouse.ipa".format(inhouse_path,
-                                                                 scheme))
-        if appstore_path:
-            dragon.exec_cmd(cwd=images_dir,
-                            cmd="ln -s {} {}-appstore.ipa".format(appstore_path,
-                                                                  scheme))
+            entitlements_path = os.path.join(archive_path, "Products",
+                                             "Applications",
+                                             "{}.app".format(app.scheme),
+                                             "archived-expanded-entitlements.xcent")
+            inhouse_path = _export_archive(calldir,
+                                           archive_path,
+                                           app,
+                                           entitlements_path,
+                                           inhouse=True)
+            appstore_path = _export_archive(calldir,
+                                            archive_path,
+                                            app,
+                                            entitlements_path,
+                                            inhouse=False)
+            # Link .ipa
+            if inhouse_path:
+                dragon.exec_cmd(cwd=images_dir,
+                                cmd="ln -s {} {}-inhouse.ipa".format(inhouse_path,
+                                                                     app.scheme))
+            if appstore_path:
+                dragon.exec_cmd(cwd=images_dir,
+                                cmd="ln -s {} {}-appstore.ipa".format(appstore_path,
+                                                                      app.scheme))
 
         # build.prop
         build_prop_file = os.path.join(dragon.OUT_DIR, "staging", "etc",
@@ -288,59 +317,38 @@ def _make_hook_images(calldir, archives, scheme,
         task.call_base_exec_hook(args)
     return _hook_images
 
-def _make_rm_previous_archive(scheme):
+def _make_rm_previous_archive(app):
     def _rm_previous_archive(task, args):
-        confname = task.name.split('-')[-1]
-        archname = os.path.join(dragon.OUT_DIR,
-                                "xcodeArchives",
-                                "{}-{}.xcarchive".format(scheme, confname))
-        dragon.exec_cmd('rm -rf {}'.format(archname))
+        dragon.exec_cmd('rm -rf {}'.format(app._archivePath(dragon.OUT_DIR)))
     return _rm_previous_archive
 
-def add_release_task(calldir="", workspace="", configuration="", scheme="",
-                     extra_args=[],
-                     inhouse_app_prefix=None, inhouse_team_id=None,
-                     appstore_app_prefix=None, appstore_team_id=None):
 
-    config_list = [configuration] if isinstance(configuration, str) else configuration
+def add_release_task(calldir="", workspace="", apps=[]):
     subtasks = []
-    archives = []
-
-    for cfg in config_list:
-        archive_path = os.path.join(
-            dragon.OUT_DIR,
-            "xcodeArchives",
-            "{}-{}".format(scheme, cfg))
-
-        _args = ["-archivePath {}".format(archive_path)]
-        _args.extend(extra_args)
-        archive_path += ".xcarchive"
-        archives.append(archive_path)
-
-        taskname = "build-archive-{}".format(cfg)
-        subtasks.append(taskname)
-
-        lambdacmd = "rm -rf {}".format(archive_path)
+    for app in apps:
+        _args = ["-archivePath {}".format(app._archivePath(dragon.OUT_DIR, skipExt=True))]
+        if app.args:
+            _args.extend(app.args)
 
         add_xcodebuild_task(
-            name=taskname,
-            desc="build archive {} for release".format(cfg),
+            name=app._taskName(),
+            desc=app._taskDesc(),
             subtasks=["build-common"],
-            prehook=_make_rm_previous_archive(scheme),
+            prehook=_make_rm_previous_archive(app),
             calldir=calldir,
             workspace=workspace,
-            configuration=cfg,
-            scheme=scheme,
+            configuration=app.configuration,
+            scheme=app.scheme,
+            bundle_id=app.bundle_id,
             action="archive",
             extra_args=_args
         )
+        subtasks.append(app._taskName())
 
     dragon.override_meta_task(
         name="images-all",
         prehook=_hook_pre_images,
-        exechook=_make_hook_images(calldir, archives, scheme,
-                                   inhouse_app_prefix, inhouse_team_id,
-                                   appstore_app_prefix, appstore_team_id)
+        exechook=_make_hook_images(calldir, apps)
     )
 
     subtasks.extend(["images-all", "gen-release-archive"])

@@ -174,7 +174,13 @@ def _hook_pre_images(task, args):
     dragon.gen_manifest_xml(manifest_path)
     task.call_base_pre_hook(args)
 
-def _make_hook_images(symbols_path, apk_dir, apk_files, abis):
+
+class App:
+    def __init__(self, apk_file, inhouse=False):
+        self.apk_file = apk_file
+        self.inhouse = inhouse
+
+def _make_hook_images(symbols_path, apps, def_abi):
     def _hook_images(task, args):
         # tar symbols
         symbols_file = os.path.join(dragon.OUT_DIR,
@@ -188,17 +194,17 @@ def _make_hook_images(symbols_path, apk_dir, apk_files, abis):
         # link apk(s)
         images_dir = os.path.join(dragon.OUT_DIR, "images")
         dragon.makedirs(images_dir)
-        apk_files_ext = [ os.path.join(apk_dir, x) for x in apk_files ]
-        cmd = "ln -s " + " ".join(apk_files_ext) + " ."
-        dragon.exec_cmd(cwd=images_dir, cmd=cmd)
+        for app in apps:
+            dragon.exec_cmd(cwd=images_dir,
+                            cmd="ln -s {} .".format(app.apk_file))
 
         # build.prop
-        build_prop_file = os.path.join(dragon.OUT_DIR, abis[-1],
+        build_prop_file = os.path.join(dragon.OUT_DIR, def_abi,
                                        "staging", "etc", "build.prop")
         dragon.exec_cmd(cwd=dragon.OUT_DIR, cmd="cp %s ." % build_prop_file)
 
         # global.config
-        global_config_file = os.path.join(dragon.OUT_DIR, abis[-1],
+        global_config_file = os.path.join(dragon.OUT_DIR, def_abi,
                                           "global.config")
         dragon.exec_cmd(cwd=dragon.OUT_DIR, cmd="cp %s ." % global_config_file)
 
@@ -206,18 +212,15 @@ def _make_hook_images(symbols_path, apk_dir, apk_files, abis):
         task.call_base_exec_hook(args)
     return _hook_images
 
-def add_release_task(symbols_path, apk_dir, apk_files, abis):
+def add_release_task(symbols_path, apps, default_abi):
 
     if dragon.OPTIONS.android_abis:
-        abis = dragon.OPTIONS.android_abis
+        default_abi = dragon.OPTIONS.android_abis[0]
 
     dragon.override_meta_task(
         name="images-all",
         prehook=_hook_pre_images,
-        exechook=_make_hook_images(symbols_path,
-                                   apk_dir,
-                                   apk_files,
-                                   abis)
+        exechook=_make_hook_images(symbols_path, apps, default_abi)
     )
 
     dragon.override_meta_task(
