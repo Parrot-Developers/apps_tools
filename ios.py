@@ -90,6 +90,7 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, bundle_id, ex
         cmd += " -project %s" % workspace
     cmd += " -configuration %s" % configuration
     cmd += " -scheme %s" % scheme
+    cmd += " -allowProvisioningUpdates"
     if os.environ.get("MOVE_APPSDATA_IN_OUTDIR"):
         cmd += " -derivedDataPath %s" % os.path.join(dragon.OUT_DIR, "xcodeDerivedData")
     cmd += " %s" % action
@@ -97,7 +98,7 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, bundle_id, ex
     cmd += " ALCHEMY_OUT_ROOT=%s" % dragon.OUT_ROOT_DIR
     cmd += " ALCHEMY_PRODUCT=%s" % dragon.PRODUCT
     if bundle_id:
-        cmd += " PRODUCT_BUNDLE_IDENTIFIER=%s" % bundle_id
+        cmd += " APP_BUNDLE_IDENTIFIER=%s" % bundle_id
     cmd += " APP_VERSION_SHORT=%s" % vname
     cmd += " APP_VERSION=%s" % version
     cmd += " APP_BUILD=%s " % vcode
@@ -227,7 +228,7 @@ def _export_archive(dirpath, archive_path, app, entitlements_path,
     _replace_app_prefix_in_entitlements(entitlements_path, signing_infos)
     ipa_path = os.path.join(dragon.OUT_DIR, "xcodeApps",
                                 "inhouse" if inhouse else "appstore")
-    cmd = "xcodebuild -exportArchive -archivePath {} -exportOptionsPlist {}" \
+    cmd = "xcodebuild -exportArchive -archivePath {} -exportOptionsPlist {} -allowProvisioningUpdates" \
           " -exportPath {}".format(archive_path, export_plist, ipa_path)
     dragon.exec_cmd(cwd=dirpath, cmd=cmd)
     return "{}/{}.ipa".format(ipa_path, app.scheme)
