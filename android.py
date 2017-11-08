@@ -176,9 +176,8 @@ def _hook_pre_images(task, args):
 
 
 class App:
-    def __init__(self, apk_file, inhouse=False):
+    def __init__(self, apk_file):
         self.apk_file = apk_file
-        self.inhouse = inhouse
 
 def _make_hook_images(symbols_path, apps, def_abi):
     def _hook_images(task, args):
