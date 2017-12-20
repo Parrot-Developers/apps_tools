@@ -3,6 +3,7 @@ import os, logging
 import re
 import string
 import dragon
+import shutil
 
 def setup_argparse(parser):
     parser.add_argument("--abis",
@@ -50,8 +51,70 @@ def _get_version_code_from_name(version_name):
     return "{:02d}{:02d}{:02d}{:01d}{:02d}".format(major, minor, rev,
                                                    variant_code, variant_num)
 
+# Address sanitizer setup/cleanup
+
+
+def _gen_asan_wrapper(abi, lib_dir, script_dir):
+    wrap_template = """#!/system/bin/sh
+HERE="$(cd "$(dirname "$0")" && pwd)"
+export ASAN_OPTIONS=log_to_syslog=false,allow_user_segv_handler=1
+export LD_PRELOAD=$HERE/libclang_rt.asan-{}-android.so
+$@"""
+    abi_filter = {
+        'arm64-v8a': 'aarch64',
+        'armeabi': 'arm',
+        'armeabi-v7a': 'arm',
+    }
+    raw_abi = abi
+    if abi in abi_filter:
+        abi = abi_filter[abi]
+    os.makedirs(lib_dir, exist_ok=True)
+    os.makedirs(script_dir, exist_ok=True)
+
+    asan_lib_fname = "libclang_rt.asan-{}-android.so".format(abi)
+    clang_path = os.path.join(dragon.OUT_DIR, raw_abi, "toolchain",
+                              "lib64", "clang")
+    if not os.path.isdir(clang_path):
+        logging.info("Unable to find clang path while setting asan_wrapper")
+        return
+
+    clang_versions = os.listdir(path=clang_path)
+    if not clang_versions:
+        logging.info("Unable to get clang version while setting asan_wrapper")
+        return
+
+    cc_version = clang_versions[0]
+    asan_lib_path = os.path.join(clang_path, cc_version, "lib",
+                                 "linux", asan_lib_fname)
+
+    shutil.copyfile(asan_lib_path, os.path.join(lib_dir, asan_lib_fname))
+
+    with open(os.path.join(script_dir, "wrap.sh"), "w") as f:
+        f.write(wrap_template.format(abi))
+
+
+
+def _asan_setup(abi):
+    asan_out_dir = os.path.join(dragon.OUT_DIR, "asan")
+    asan_lib_dir = os.path.join(asan_out_dir, "libs", abi)
+    asan_script_dir = os.path.join(asan_out_dir, "scripts", "lib", abi)
+    _gen_asan_wrapper(abi, asan_lib_dir, asan_script_dir)
+
+def _asan_clean(abi):
+    asan_out_dir = os.path.join(dragon.OUT_DIR, "asan")
+    asan_lib_dir = os.path.join(asan_out_dir, "libs", abi)
+    asan_script_dir = os.path.join(asan_out_dir, "scripts", "lib", abi)
+    if os.path.exists(asan_lib_dir):
+        shutil.rmtree(asan_lib_dir)
+    if os.path.exists(asan_script_dir):
+        shutil.rmtree(asan_script_dir)
+
 # Register a task to build android common code for a specific abi/arch
-def _add_android_abi(abi):
+def _add_android_abi(abi, asan=False):
+
+    # Create asan wrapper scripts if required
+    asan_build_func = _asan_setup if asan else _asan_clean
+
     dragon.add_alchemy_task(
         name="build-common-{}".format(abi),
         desc="Build android common for {}".format(abi),
@@ -59,6 +122,7 @@ def _add_android_abi(abi):
         variant=dragon.VARIANT,
         defargs=["all", "sdk"],
         prehook=lambda task, args: _setup_android_abi(task, args, abi),
+        posthook=lambda task, args: asan_build_func(abi),
         weak=True,
         outsubdir=abi
     )
@@ -70,11 +134,20 @@ def _add_android_abi(abi):
         variant=dragon.VARIANT,
         defargs=["clobber"],
         prehook=lambda task, args: _setup_android_abi(task, args, abi),
+        posthook=lambda task, args: _asan_clean(abi),
         weak=True,
         outsubdir=abi
     )
 
 def _ndk_build(calldir, module, abis, extra_args, ignore_failure=False):
+
+    # Check if asan is used
+    raw_asan = dragon.get_alchemy_var('USE_ADDRESS_SANITIZER')
+    if not raw_asan or raw_asan == '0':
+        asan = False
+    else:
+        asan = True
+
     outdir = os.path.join(dragon.OUT_DIR, "jni", module)
     args = "NDK_OUT=%s" % os.path.join(outdir, "obj")
     args += " NDK_LIBS_OUT=%s" % os.path.join(outdir, "libs")
@@ -82,6 +155,8 @@ def _ndk_build(calldir, module, abis, extra_args, ignore_failure=False):
       "products", dragon.PRODUCT, dragon.VARIANT)
     args += " PRODUCT_OUT_DIR=%s" % dragon.OUT_DIR
     args += " APP_ABI=\"%s\"" % " ".join(abis)
+    if asan:
+        args += " LOCAL_ALLOW_UNDEFINED_SYMBOLS=true"
     if dragon.OPTIONS.verbose:
         args += " V=1"
     args += " -j%d " % dragon.OPTIONS.jobs.job_num
@@ -140,9 +215,17 @@ def add_gradle_task(*, calldir, target="", extra_args=[],
 def add_task_build_common(android_abis, default_abi=None):
     if dragon.OPTIONS.android_abis:
         android_abis = dragon.OPTIONS.android_abis
+
+    # Check if asan is used
+    raw_asan = dragon.get_alchemy_var('USE_ADDRESS_SANITIZER')
+    if not raw_asan or raw_asan == '0':
+        asan = False
+    else:
+        asan = True
+
     # Register all abi/arch\
     for abi in android_abis:
-        _add_android_abi(abi)
+        _add_android_abi(abi, asan)
 
     # Update basic alchemy task to use default abi
     if not default_abi:
