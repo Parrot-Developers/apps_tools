@@ -93,7 +93,7 @@ def _ndk_build(calldir, module, abis, extra_args, ignore_failure=False):
         if not ignore_failure:
             raise
 
-def add_ndk_build_task(calldir="", module="", abis=[], extra_args=[],
+def add_ndk_build_task(*, calldir="", module="", abis=[], extra_args=[],
                        name="", desc="", subtasks=[], ignore_failure=False):
     if dragon.OPTIONS.android_abis:
         abis = dragon.OPTIONS.android_abis
@@ -125,7 +125,7 @@ def _gradle(calldir, extra_args):
     cmd +=" ".join(extra_args)
     dragon.exec_cmd(cmd, cwd=calldir)
 
-def add_gradle_task(calldir, target="", extra_args=[],
+def add_gradle_task(*, calldir, target="", extra_args=[],
                     name="", desc="", subtasks=[]):
     _args = [target]
     _args.extend(extra_args)
