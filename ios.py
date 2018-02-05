@@ -315,7 +315,7 @@ def _make_rm_previous_archive(app):
     return _rm_previous_archive
 
 
-def add_release_task(*, calldir="", workspace="", apps=[]):
+def add_release_task(*, calldir="", workspace="", apps=[], extra_tasks=[]):
     subtasks = []
     for app in apps:
         _args = ["-archivePath {}".format(app._archivePath(dragon.OUT_DIR, skipExt=True))]
@@ -344,7 +344,9 @@ def add_release_task(*, calldir="", workspace="", apps=[]):
         exechook=_make_hook_images(calldir, apps)
     )
 
-    subtasks.extend(["images-all", "gen-release-archive"])
+    subtasks.append("images-all")
+    subtasks.extend(extra_tasks)
+    subtasks.append("gen-release-archive")
 
     dragon.override_meta_task(
         name="release",
