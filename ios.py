@@ -124,23 +124,21 @@ def add_xcodebuild_task(*, calldir="", workspace="", configuration="",
                                                 extra_args)
     )
 
-def _jazzy(calldir, workspace, scheme, extra_args):
+def _jazzy(calldir, scheme, extra_args):
     cmd = "jazzy"
-    cmd += " -x -workspace,%s" % workspace
     cmd += " -x -scheme,%s" % scheme
     outdir = os.path.join(dragon.OUT_DIR, "docs")
     cmd += " -o %s " % outdir
     cmd += " ".join(extra_args)
     dragon.exec_cmd(cmd, cwd=calldir)
 
-def add_jazzy_task(*, calldir="", workspace="", scheme="", extra_args=[],
+def add_jazzy_task(*, calldir="", scheme="", extra_args=[],
                    name="", desc="", subtasks=[]):
     dragon.add_meta_task(
         name=name,
         desc=desc,
         subtasks=subtasks,
-        posthook=lambda task, args: _jazzy(calldir, workspace, scheme,
-                                           extra_args)
+        posthook=lambda task, args: _jazzy(calldir, scheme, extra_args)
     )
 
 def add_task_build_common():
