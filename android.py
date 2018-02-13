@@ -211,7 +211,7 @@ def _make_hook_images(symbols_path, apps, def_abi):
         task.call_base_exec_hook(args)
     return _hook_images
 
-def add_release_task(symbols_path, apps, default_abi):
+def add_release_task(symbols_path, apps, default_abi, extra_tasks=[]):
 
     if dragon.OPTIONS.android_abis:
         default_abi = dragon.OPTIONS.android_abis[0]
@@ -222,11 +222,14 @@ def add_release_task(symbols_path, apps, default_abi):
         exechook=_make_hook_images(symbols_path, apps, default_abi)
     )
 
+    subtasks = [
+        "build",
+        "images-all"
+    ]
+    subtasks.extend(extra_tasks)
+    subtasks.append("gen-release-archive")
+
     dragon.override_meta_task(
         name="release",
-        subtasks=[
-            "build",
-            "images-all",
-            "gen-release-archive"
-        ]
+        subtasks=subtasks
     )
