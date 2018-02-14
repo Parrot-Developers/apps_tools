@@ -126,13 +126,14 @@ def _gradle(calldir, extra_args):
     dragon.exec_cmd(cmd, cwd=calldir)
 
 def add_gradle_task(*, calldir, target="", extra_args=[],
-                    name="", desc="", subtasks=[]):
+                    name="", desc="", subtasks=[], prehook=None):
     _args = [target]
     _args.extend(extra_args)
     dragon.add_meta_task(
         name=name,
         desc=desc,
         subtasks=subtasks,
+        prehook=prehook,
         posthook=lambda task, dragon_args: _gradle(calldir, _args)
     )
 
