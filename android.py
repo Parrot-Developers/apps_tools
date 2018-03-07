@@ -64,6 +64,7 @@ $@"""
         'arm64-v8a': 'aarch64',
         'armeabi': 'arm',
         'armeabi-v7a': 'arm',
+        'x86': 'i686',
     }
     raw_abi = abi
     if abi in abi_filter:
