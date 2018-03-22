@@ -46,7 +46,7 @@ def _get_version_code_from_name(version_name):
                       "beta": 1,
                       "rc": 2,
                       "release": 3,
-                      };
+                      }
     try:
         variant_code = variant_codes[variant_name]
     except KeyError:

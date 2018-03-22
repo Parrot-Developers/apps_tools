@@ -32,7 +32,7 @@ def _get_version_code_from_name(version_name):
                       "beta": 1,
                       "rc": 2,
                       "release": 3,
-                      };
+                      }
     try:
         variant_code = variant_codes[variant_name]
     except KeyError:
@@ -79,6 +79,14 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, bundle_id, te
     version = dragon.PARROT_BUILD_PROP_VERSION
     vname, _, _ = version.partition('-')
     vcode = _get_version_code_from_name(version)
+
+    # Check if asan is used
+    raw_asan = dragon.get_alchemy_var('USE_ADDRESS_SANITIZER')
+    if not raw_asan or raw_asan == '0':
+        asan = False
+    else:
+        asan = True
+
     cmd = "xcodebuild"
     if (dragon.VARIANT == "ios_sim"):
         cmd += " -sdk iphonesimulator -arch x86_64"
@@ -93,6 +101,8 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, bundle_id, te
     cmd += " -allowProvisioningUpdates"
     if os.environ.get("MOVE_APPSDATA_IN_OUTDIR"):
         cmd += " -derivedDataPath %s" % os.path.join(dragon.OUT_DIR, "xcodeDerivedData")
+    if asan:
+        cmd += " -enableAddressSanitizer YES"
     cmd += " %s" % action
     cmd += " ALCHEMY_OUT=%s" % dragon.OUT_DIR
     cmd += " ALCHEMY_OUT_ROOT=%s" % dragon.OUT_ROOT_DIR
