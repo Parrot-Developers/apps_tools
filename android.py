@@ -1,9 +1,11 @@
 # base to build an Android application
-import os, logging
+import os
+import logging
 import re
 import string
 import dragon
 import shutil
+
 
 def setup_argparse(parser):
     parser.add_argument("--abis",
@@ -14,9 +16,11 @@ def setup_argparse(parser):
                                  "x86", "x86_64"),
                         help="Select which android ABIS to build")
 
+
 def _setup_android_abi(task, args, abi):
     task.call_base_pre_hook(args)
     task.extra_env["ANDROID_ABI"] = abi
+
 
 def _get_version_code_from_name(version_name):
     if version_name == "0.0.0" or version_name.startswith("0.0.0-"):
@@ -201,6 +205,7 @@ def _gradle(calldir, extra_args):
     cmd +=" ".join(extra_args)
     dragon.exec_cmd(cmd, cwd=calldir)
 
+
 def add_gradle_task(*, calldir, target="", extra_args=[],
                     name="", desc="", subtasks=[], prehook=None):
     _args = [target]
@@ -212,6 +217,25 @@ def add_gradle_task(*, calldir, target="", extra_args=[],
         prehook=prehook,
         posthook=lambda task, dragon_args: _gradle(calldir, _args)
     )
+
+
+def _hook_alchemy_genproject_android(task, args, abi):
+    script_path = os.path.join(dragon.ALCHEMY_HOME, "scripts",
+                               "genproject", "genproject.py")
+    subscript_name = task.name.replace("gen", "")
+
+    if "-h" in args or "--help" in args:
+        dragon.exec_cmd("%s %s -h" % (script_path, subscript_name))
+        dragon.LOGW("Note: The -b option and dump_xml file are automatically given.")
+        raise dragon.TaskExit()
+
+    dragon.exec_cmd(cmd="./build.sh -p %s-%s --abis %s -A dump-xml" % (dragon.PRODUCT, dragon.VARIANT, abi))
+    dump_xml = os.path.join(dragon.OUT_DIR, abi, "alchemy-database.xml")
+    cmd_args = [script_path, subscript_name,
+                "-b", "'-p %s-%s --abis %s -A'" % (dragon.PRODUCT, dragon.VARIANT, abi),
+                dump_xml, " ".join(args)]
+    dragon.exec_cmd(" ".join(cmd_args))
+
 
 def add_task_build_common(android_abis, default_abi=None):
     if dragon.OPTIONS.android_abis:
@@ -237,6 +261,19 @@ def add_task_build_common(android_abis, default_abi=None):
         dragon.override_alchemy_task("alchemy",
                 prehook=lambda task, args: _setup_android_abi(task, args, default_abi),
                 outsubdir=default_abi)
+
+    # Override genproject tasks
+    gen_tasks = {
+        "geneclipse": "Generate Eclipse CDT project",
+        "genqtcreator": "Generate QtCreator project",
+        "genvscode": "Generate VisualStudio Code project",
+    }
+    for taskname, taskdesc in gen_tasks.items():
+        dragon.override_meta_task(
+            name=taskname,
+            desc=taskdesc,
+            exechook=lambda task, args: _hook_alchemy_genproject_android(task, args, default_abi)
+        )
 
     # Meta-task to build all common code abi/arch
     dragon.add_meta_task(
