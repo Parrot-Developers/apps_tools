@@ -198,24 +198,12 @@ def _create_export_plist(signing_infos, bundle_id):
         f.write(template.format(signing_infos.team_id, bundle_id, signing_infos.profile))
     return plist_name
 
-def _replace_app_prefix_in_entitlements(entitlements_path, signing_infos):
-    fh, tmp_path = tempfile.mkstemp()
-    with open(tmp_path,"w") as f, open(entitlements_path) as ent:
-        for l in ent:
-            f.write(re.sub(r'(.*<string)>[A-Z0-9]{10}(.com.parrot)',
-                           r'\1>{}\2'.format(signing_infos.app_prefix),
-                           l))
-    os.close(fh)
-    os.remove(entitlements_path)
-    shutil.move(tmp_path, entitlements_path)
-
-def _export_archive(dirpath, archive_path, app, entitlements_path):
+def _export_archive(dirpath, archive_path, app):
     signing_infos = app.inhouse_infos
     if signing_infos is None:
         return None
 
     export_plist = _create_export_plist(signing_infos, app.bundle_id)
-    _replace_app_prefix_in_entitlements(entitlements_path, signing_infos)
     ipa_path = os.path.join(dragon.OUT_DIR, "xcodeApps", "temp")
     ipa_out_path = os.path.join(dragon.OUT_DIR, "xcodeApps", "inhouse")
     cmd = "xcodebuild -exportArchive -archivePath {} -exportOptionsPlist {} -allowProvisioningUpdates" \
@@ -296,14 +284,9 @@ def _make_hook_images(calldir, apps):
             tar.close()
             os.chdir(cwd)
 
-            entitlements_path = os.path.join(archive_path, "Products",
-                                             "Applications",
-                                             "{}.app".format(app.scheme),
-                                             "archived-expanded-entitlements.xcent")
             inhouse_path = _export_archive(calldir,
                                            archive_path,
-                                           app,
-                                           entitlements_path)
+                                           app)
             # Link .ipa
             if inhouse_path:
                 dragon.exec_cmd(cwd=images_dir,
