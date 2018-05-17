@@ -308,7 +308,7 @@ def _make_rm_previous_archive(app):
     return _rm_previous_archive
 
 
-def add_release_task(*, calldir="", workspace="", apps=[], extra_tasks=[]):
+def add_release_task(*, calldir="", workspace="", apps=[], extra_tasks=[], build_common_task='build-common'):
     subtasks = []
     for app in apps:
         _args = ["-archivePath {}".format(app._archivePath(dragon.OUT_DIR, skipExt=True))]
@@ -318,7 +318,7 @@ def add_release_task(*, calldir="", workspace="", apps=[], extra_tasks=[]):
         add_xcodebuild_task(
             name=app._taskName(),
             desc=app._taskDesc(),
-            subtasks=["build-common"],
+            subtasks=[build_common_task],
             prehook=_make_rm_previous_archive(app),
             calldir=calldir,
             workspace=workspace,
