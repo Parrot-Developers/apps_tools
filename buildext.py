@@ -1,4 +1,4 @@
-# Empty script
+# Common things
 
 import apps_tools.android as android
 

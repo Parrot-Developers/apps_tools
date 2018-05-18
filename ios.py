@@ -121,17 +121,13 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, bundle_id, te
 
 def add_xcodebuild_task(*, calldir="", workspace="", configuration="",
                         scheme="", action="", bundle_id=None, team_id=None,
-                         extra_args=[],
-                        name="", desc="", subtasks=[], prehook=None):
+                         extra_args=[], **kwargs):
     dragon.add_meta_task(
-        name=name,
-        desc=desc,
-        subtasks=subtasks,
-        prehook=prehook,
         posthook=lambda task, args: _xcodebuild(calldir, workspace,
                                                 configuration, scheme,
                                                 action, bundle_id, team_id,
-                                                extra_args)
+                                                extra_args),
+        **kwargs
     )
 
 def _jazzy(calldir, scheme, extra_args):
@@ -142,13 +138,10 @@ def _jazzy(calldir, scheme, extra_args):
     cmd += " ".join(extra_args)
     dragon.exec_cmd(cmd, cwd=calldir)
 
-def add_jazzy_task(*, calldir="", scheme="", extra_args=[],
-                   name="", desc="", subtasks=[]):
+def add_jazzy_task(*, calldir="", scheme="", extra_args=[], **kwargs):
     dragon.add_meta_task(
-        name=name,
-        desc=desc,
-        subtasks=subtasks,
-        posthook=lambda task, args: _jazzy(calldir, scheme, extra_args)
+        posthook=lambda task, args: _jazzy(calldir, scheme, extra_args),
+        **kwargs
     )
 
 def add_task_build_common():
@@ -159,7 +152,8 @@ def add_task_build_common():
         variant=dragon.VARIANT,
         defargs=["all", "sdk"],
         weak=True,
-        posthook=lambda task, args: _set_product()
+        posthook=lambda task, args: _set_product(),
+        secondary_help=True
     )
 
     dragon.add_alchemy_task(
@@ -169,6 +163,7 @@ def add_task_build_common():
         variant=dragon.VARIANT,
         defargs=["clobber"],
         weak=True,
+        secondary_help=True
     )
 
 _inhouse_plist_template="""
@@ -327,7 +322,8 @@ def add_release_task(*, calldir="", workspace="", apps=[], extra_tasks=[], build
             bundle_id=app.bundle_id,
             action="archive",
             team_id=app.build_team_id,
-            extra_args=_args
+            extra_args=_args,
+            secondary_help=True
         )
         subtasks.append(app._taskName())
 

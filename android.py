@@ -129,7 +129,8 @@ def _add_android_abi(abi, asan=False):
         prehook=lambda task, args: _setup_android_abi(task, args, abi),
         posthook=lambda task, args: asan_build_func(abi),
         weak=True,
-        outsubdir=abi
+        outsubdir=abi,
+        secondary_help=True
     )
 
     dragon.add_alchemy_task(
@@ -141,7 +142,8 @@ def _add_android_abi(abi, asan=False):
         prehook=lambda task, args: _setup_android_abi(task, args, abi),
         posthook=lambda task, args: _asan_clean(abi),
         weak=True,
-        outsubdir=abi
+        outsubdir=abi,
+        secondary_help=True
     )
 
 def _ndk_build(calldir, module, abis, extra_args, ignore_failure=False):
@@ -173,17 +175,14 @@ def _ndk_build(calldir, module, abis, extra_args, ignore_failure=False):
         if not ignore_failure:
             raise
 
-def add_ndk_build_task(*, calldir="", module="", abis=[], extra_args=[],
-                       name="", desc="", subtasks=[], ignore_failure=False):
+def add_ndk_build_task(*, calldir="", module="", abis=[], extra_args=[], ignore_failure=False, **kwargs):
     if dragon.OPTIONS.android_abis:
         abis = dragon.OPTIONS.android_abis
     dragon.add_meta_task(
-        name=name,
-        desc=desc,
-        subtasks=subtasks,
         posthook=lambda task, dragon_args: _ndk_build(calldir, module, abis,
                                                       extra_args,
-                                                      ignore_failure)
+                                                      ignore_failure),
+        **kwargs
     )
 
 def _gradle(calldir, extra_args):
@@ -206,16 +205,12 @@ def _gradle(calldir, extra_args):
     dragon.exec_cmd(cmd, cwd=calldir)
 
 
-def add_gradle_task(*, calldir, target="", extra_args=[],
-                    name="", desc="", subtasks=[], prehook=None):
+def add_gradle_task(*, calldir, target="", extra_args=[], **kwargs):
     _args = [target]
     _args.extend(extra_args)
     dragon.add_meta_task(
-        name=name,
-        desc=desc,
-        subtasks=subtasks,
-        prehook=prehook,
-        posthook=lambda task, dragon_args: _gradle(calldir, _args)
+        posthook=lambda task, dragon_args: _gradle(calldir, _args),
+        **kwargs
     )
 
 
@@ -280,13 +275,15 @@ def add_task_build_common(android_abis, default_abi=None):
         name="build-common",
         desc="Build android common code for all architectures",
         subtasks=["build-common-" + abi for abi in android_abis],
-        weak=True
+        weak=True,
+        secondary_help=True
     )
     dragon.add_meta_task(
         name="clean-common",
         desc="Clean android common code for all architectures",
         subtasks=["clean-common-" + abi for abi in android_abis],
-        weak=True
+        weak=True,
+        secondary_help=True
     )
 
 def _hook_pre_images(task, args):
