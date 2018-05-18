@@ -25,7 +25,8 @@ def _setup_android_abi(task, args, abi):
 def _get_version_code_from_name(version_name):
     if version_name == "0.0.0" or version_name.startswith("0.0.0-"):
         return "0"
-    if not re.match(r"[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}(-(alpha|beta|rc)+[0-9]{0,2})?$",
+    if not re.match(r"[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}" +
+                    r"(-(alpha|beta|rc)+[0-9]{0,2})?$",
                     version_name, flags=re.IGNORECASE):
         raise ValueError("Bad version name : " + version_name)
 
@@ -42,11 +43,12 @@ def _get_version_code_from_name(version_name):
         variant_num = 0
     variant_name = variant.strip(string.digits)
 
-    variant_codes = { "alpha": 0,
-                      "beta": 1,
-                      "rc": 2,
-                      "release": 3,
-                      }
+    variant_codes = {
+        "alpha": 0,
+        "beta": 1,
+        "rc": 2,
+        "release": 3,
+    }
     try:
         variant_code = variant_codes[variant_name]
     except KeyError:
@@ -98,12 +100,12 @@ $@"""
         f.write(wrap_template.format(abi))
 
 
-
 def _asan_setup(abi):
     asan_out_dir = os.path.join(dragon.OUT_DIR, "asan")
     asan_lib_dir = os.path.join(asan_out_dir, "libs", abi)
     asan_script_dir = os.path.join(asan_out_dir, "scripts", "lib", abi)
     _gen_asan_wrapper(abi, asan_lib_dir, asan_script_dir)
+
 
 def _asan_clean(abi):
     asan_out_dir = os.path.join(dragon.OUT_DIR, "asan")
@@ -115,6 +117,8 @@ def _asan_clean(abi):
         shutil.rmtree(asan_script_dir)
 
 # Register a task to build android common code for a specific abi/arch
+
+
 def _add_android_abi(abi, asan=False):
 
     # Create asan wrapper scripts if required
@@ -146,6 +150,7 @@ def _add_android_abi(abi, asan=False):
         secondary_help=True
     )
 
+
 def _ndk_build(calldir, module, abis, extra_args, ignore_failure=False):
 
     # Check if asan is used
@@ -159,7 +164,8 @@ def _ndk_build(calldir, module, abis, extra_args, ignore_failure=False):
     args = "NDK_OUT=%s" % os.path.join(outdir, "obj")
     args += " NDK_LIBS_OUT=%s" % os.path.join(outdir, "libs")
     args += " PRODUCT_DIR=%s" % os.path.join(dragon.WORKSPACE_DIR,
-      "products", dragon.PRODUCT, dragon.VARIANT)
+                                             "products", dragon.PRODUCT,
+                                             dragon.VARIANT)
     args += " PRODUCT_OUT_DIR=%s" % dragon.OUT_DIR
     args += " APP_ABI=\"%s\"" % " ".join(abis)
     if asan:
@@ -175,7 +181,9 @@ def _ndk_build(calldir, module, abis, extra_args, ignore_failure=False):
         if not ignore_failure:
             raise
 
-def add_ndk_build_task(*, calldir="", module="", abis=[], extra_args=[], ignore_failure=False, **kwargs):
+
+def add_ndk_build_task(*, calldir="", module="", abis=[], extra_args=[],
+                       ignore_failure=False, **kwargs):
     if dragon.OPTIONS.android_abis:
         abis = dragon.OPTIONS.android_abis
     dragon.add_meta_task(
@@ -185,6 +193,7 @@ def add_ndk_build_task(*, calldir="", module="", abis=[], extra_args=[], ignore_
         **kwargs
     )
 
+
 def _gradle(calldir, extra_args):
     version = dragon.PARROT_BUILD_PROP_VERSION
     vname, _, suffix = version.partition('-')
@@ -192,16 +201,16 @@ def _gradle(calldir, extra_args):
 
     cmd = "./gradlew"
     if os.environ.get("MOVE_APPSDATA_IN_OUTDIR"):
-        cmd +=" --project-cache-dir %s" % os.path.join(dragon.OUT_DIR,
-                                                       ".gradle")
-    cmd +=" -PalchemyOutRoot=%s" % dragon.OUT_ROOT_DIR
-    cmd +=" -PalchemyOut=%s" % dragon.OUT_DIR
-    cmd +=" -PalchemyProduct=%s" % dragon.PRODUCT
-    cmd +=" -PappVersionName=%s" % vname
+        cmd += " --project-cache-dir %s" % os.path.join(dragon.OUT_DIR,
+                                                        ".gradle")
+    cmd += " -PalchemyOutRoot=%s" % dragon.OUT_ROOT_DIR
+    cmd += " -PalchemyOut=%s" % dragon.OUT_DIR
+    cmd += " -PalchemyProduct=%s" % dragon.PRODUCT
+    cmd += " -PappVersionName=%s" % vname
     if suffix:
-        cmd +=" -PappVersionNameSuffix=-%s" % suffix
-    cmd +=" -PappVersionCode=%s " % vcode
-    cmd +=" ".join(extra_args)
+        cmd += " -PappVersionNameSuffix=-%s" % suffix
+    cmd += " -PappVersionCode=%s " % vcode
+    cmd += " ".join(extra_args)
     dragon.exec_cmd(cmd, cwd=calldir)
 
 
@@ -221,13 +230,16 @@ def _hook_alchemy_genproject_android(task, args, abi):
 
     if "-h" in args or "--help" in args:
         dragon.exec_cmd("%s %s -h" % (script_path, subscript_name))
-        dragon.LOGW("Note: The -b option and dump_xml file are automatically given.")
+        dragon.LOGW(
+            "Note: The -b option and dump_xml file are automatically given.")
         raise dragon.TaskExit()
 
-    dragon.exec_cmd(cmd="./build.sh -p %s-%s --abis %s -A dump-xml" % (dragon.PRODUCT, dragon.VARIANT, abi))
+    dragon.exec_cmd(cmd="./build.sh -p %s-%s --abis %s -A dump-xml" %
+                    (dragon.PRODUCT, dragon.VARIANT, abi))
     dump_xml = os.path.join(dragon.OUT_DIR, abi, "alchemy-database.xml")
     cmd_args = [script_path, subscript_name,
-                "-b", "'-p %s-%s --abis %s -A'" % (dragon.PRODUCT, dragon.VARIANT, abi),
+                "-b", "'-p %s-%s --abis %s -A'" % (
+                    dragon.PRODUCT, dragon.VARIANT, abi),
                 dump_xml, " ".join(args)]
     dragon.exec_cmd(" ".join(cmd_args))
 
@@ -251,11 +263,14 @@ def add_task_build_common(android_abis, default_abi=None):
     if not default_abi:
         default_abi = android_abis[0]
     if default_abi not in android_abis:
-        logging.error("Default android abi(%s) is not in %s", default_abi, android_abis)
+        logging.error("Default android abi(%s) is not in %s",
+                      default_abi, android_abis)
     else:
         dragon.override_alchemy_task("alchemy",
-                prehook=lambda task, args: _setup_android_abi(task, args, default_abi),
-                outsubdir=default_abi)
+                                     prehook=lambda task, args:
+                                     _setup_android_abi(task, args,
+                                                        default_abi),
+                                     outsubdir=default_abi)
 
     # Override genproject tasks
     gen_tasks = {
@@ -267,7 +282,8 @@ def add_task_build_common(android_abis, default_abi=None):
         dragon.override_meta_task(
             name=taskname,
             desc=taskdesc,
-            exechook=lambda task, args: _hook_alchemy_genproject_android(task, args, default_abi)
+            exechook=lambda task, args: _hook_alchemy_genproject_android(
+                task, args, default_abi)
         )
 
     # Meta-task to build all common code abi/arch
@@ -286,6 +302,7 @@ def add_task_build_common(android_abis, default_abi=None):
         secondary_help=True
     )
 
+
 def _hook_pre_images(task, args):
     # cleanup
     dragon.exec_cmd(cwd=dragon.OUT_DIR, cmd="rm -rf images")
@@ -297,6 +314,7 @@ def _hook_pre_images(task, args):
 class App:
     def __init__(self, apk_file):
         self.apk_file = apk_file
+
 
 def _make_hook_images(symbols_path, apps, def_abi):
     def _hook_images(task, args):
@@ -330,7 +348,9 @@ def _make_hook_images(symbols_path, apps, def_abi):
         task.call_base_exec_hook(args)
     return _hook_images
 
-def add_release_task(symbols_path, apps, default_abi, *, extra_tasks=[], build_task='build'):
+
+def add_release_task(symbols_path, apps, default_abi, *,
+                     extra_tasks=[], build_task='build'):
 
     if dragon.OPTIONS.android_abis:
         default_abi = dragon.OPTIONS.android_abis[0]
