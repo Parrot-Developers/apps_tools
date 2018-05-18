@@ -82,7 +82,7 @@ def add_xctool_task(calldir="", workspace="", configuration="",
 
 
 def _xcodebuild(calldir, workspace, configuration, scheme, action, bundle_id,
-                team_id, extra_args):
+                team_id, extra_args, short_version):
     version = dragon.PARROT_BUILD_PROP_VERSION
     vname, _, _ = version.partition('-')
     vcode = _get_version_code_from_name(version)
@@ -120,7 +120,9 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, bundle_id,
     if team_id:
         cmd += " DEVELOPMENT_TEAM=%s" % team_id
     cmd += " APP_VERSION_SHORT=%s" % vname
-    cmd += " APP_VERSION=%s" % version
+    cmd += " APP_VERSION_LONG=%s" % version
+    cmd += " APP_VERSION=%s" % vname if short_version else version
+
     cmd += " APP_BUILD=%s " % vcode
     cmd += " ".join(extra_args)
     if not dragon.OPTIONS.verbose and shutil.which("xcpretty"):
@@ -130,12 +132,12 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, bundle_id,
 
 def add_xcodebuild_task(*, calldir="", workspace="", configuration="",
                         scheme="", action="", bundle_id=None, team_id=None,
-                        extra_args=[], **kwargs):
+                        extra_args=[], short_version=False, **kwargs):
     dragon.add_meta_task(
         posthook=lambda task, args: _xcodebuild(calldir, workspace,
                                                 configuration, scheme,
                                                 action, bundle_id, team_id,
-                                                extra_args),
+                                                extra_args, short_version),
         **kwargs
     )
 
@@ -247,13 +249,15 @@ class App:
     _app_id = 0
 
     def __init__(self, scheme, configuration, bundle_id, *, args=[],
-                 inhouse_infos=None, display_name=None, build_team_id=None):
+                 inhouse_infos=None, display_name=None, build_team_id=None,
+                 use_short_version=False):
         self.configuration = configuration
         self.scheme = scheme
         self.bundle_id = bundle_id
         self.args = args
         self.inhouse_infos = inhouse_infos
         self.build_team_id = build_team_id
+        self.short_version = use_short_version
         if display_name:
             self.name = display_name
             self.ipa_name = "{}.ipa".format(display_name)
@@ -352,7 +356,8 @@ def add_release_task(*, calldir="", workspace="", apps=[], extra_tasks=[],
             action="archive",
             team_id=app.build_team_id,
             extra_args=_args,
-            secondary_help=True
+            secondary_help=True,
+            short_version=app.short_version
         )
         subtasks.append(app._taskName())
 
