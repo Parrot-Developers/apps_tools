@@ -121,7 +121,7 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, bundle_id,
         cmd += " DEVELOPMENT_TEAM=%s" % team_id
     cmd += " APP_VERSION_SHORT=%s" % vname
     cmd += " APP_VERSION_LONG=%s" % version
-    cmd += " APP_VERSION=%s" % vname if short_version else version
+    cmd += " APP_VERSION=%s" % (vname if short_version else version)
 
     cmd += " APP_BUILD=%s " % vcode
     cmd += " ".join(extra_args)
