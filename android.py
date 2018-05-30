@@ -54,8 +54,9 @@ def _get_version_code_from_name(version_name):
     except KeyError:
         variant_code = 0
 
-    return "{:02d}{:02d}{:02d}{:01d}{:02d}".format(major, minor, rev,
+    code = "{:02d}{:02d}{:02d}{:01d}{:02d}".format(major, minor, rev,
                                                    variant_code, variant_num)
+    return code.lstrip("0")
 
 # Address sanitizer setup/cleanup
 
