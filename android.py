@@ -168,7 +168,7 @@ def _ndk_build(calldir, module, abis, extra_args, ignore_failure=False):
                                              "products", dragon.PRODUCT,
                                              dragon.VARIANT)
     args += " PRODUCT_OUT_DIR=%s" % dragon.OUT_DIR
-    args += " APP_ABI=\"%s\"" % " ".join(abis)
+    args += ' APP_ABI="%s"' % " ".join(abis)
     if asan:
         args += " LOCAL_ALLOW_UNDEFINED_SYMBOLS=true"
     if dragon.OPTIONS.verbose:
@@ -195,7 +195,7 @@ def add_ndk_build_task(*, calldir="", module="", abis=[], extra_args=[],
     )
 
 
-def _gradle(calldir, extra_args):
+def _gradle(calldir, abis, extra_args):
     version = dragon.PARROT_BUILD_PROP_VERSION
     vname, _, suffix = version.partition('-')
     vcode = _get_version_code_from_name(version)
@@ -207,6 +207,8 @@ def _gradle(calldir, extra_args):
     cmd += " -PalchemyOutRoot=%s" % dragon.OUT_ROOT_DIR
     cmd += " -PalchemyOut=%s" % dragon.OUT_DIR
     cmd += " -PalchemyProduct=%s" % dragon.PRODUCT
+    if abis:
+        cmd += ' -PappAbis="%s"' % " ".join(abis)
     cmd += " -PappVersionName=%s" % vname
     if suffix:
         cmd += " -PappVersionNameSuffix=-%s" % suffix
@@ -215,11 +217,13 @@ def _gradle(calldir, extra_args):
     dragon.exec_cmd(cmd, cwd=calldir)
 
 
-def add_gradle_task(*, calldir, target="", extra_args=[], **kwargs):
+def add_gradle_task(*, calldir, target="", abis=[], extra_args=[], **kwargs):
+    if dragon.OPTIONS.android_abis:
+        abis = dragon.OPTIONS.android_abis
     _args = [target]
     _args.extend(extra_args)
     dragon.add_meta_task(
-        posthook=lambda task, dragon_args: _gradle(calldir, _args),
+        posthook=lambda task, dragon_args: _gradle(calldir, abis, _args),
         **kwargs
     )
 
