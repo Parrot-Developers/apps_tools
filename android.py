@@ -5,6 +5,107 @@ import re
 import string
 import dragon
 import shutil
+import sys
+
+
+class _ndk_version:
+    def __init__(self, name, minor=0):
+        if isinstance(name, str):
+            self._parse(name)
+        else:
+            self.major = name
+            self.minor = minor
+
+    def _parse(self, name):
+        if name.startswith("r"):
+            name = name[1:]
+        self.major = int(name[:2])
+        name = name[2:]
+        if name:
+            self.minor = string.ascii_lowercase.index(name[0])
+        else:
+            self.minor = 0
+
+    def __repr__(self):
+        if self.minor > 0:
+            return "r{}{}".format(self.major,
+                                  string.ascii_lowercase[self.minor])
+        return "r{}".format(self.major)
+
+    def __eq__(self, other):
+        return self.major == other.major and self.minor == other.minor
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __lt__(self, other):
+        if self.major < other.major:
+            return True
+        if self.major == other.major and self.minor < other.minor:
+            return True
+        return False
+
+    def __gt__(self, other):
+        if self.major > other.major:
+            return True
+        if self.major == other.major and self.minor > other.minor:
+            return True
+        return False
+
+    def __le__(self, other):
+        return not self.__gt__(other)
+
+    def __ge__(self, other):
+        return not self.__lt__(other)
+
+
+def _get_ndk_version(min_version=None, max_version=None, source="apps_tools"):
+    try:
+        ndkPath = os.environ["ANDROID_NDK_PATH"]
+    except KeyError:
+        logging.error("ANDROID_NDK_PATH needs to be defined")
+        sys.exit(1)
+    propFile = os.path.join(ndkPath, "source.properties")
+    with open(propFile, 'r') as f:
+        for line in f:
+            if "Pkg.Revision" not in line:
+                continue
+            _, _, v = line.partition("=")
+            v = v.strip()
+    version = v.split('.')
+    try:
+        version = [int(x) for x in version[:2]]
+        version = _ndk_version(version[0], version[1])
+    except ValueError:
+        logging.error("Unable to read android ndk version")
+        sys.exit(1)
+    if min_version is not None and version < min_version:
+        logging.error("NDK {} is too old for {}. Expected at least {}".format(
+            version, source, min_version))
+        sys.exit(1)
+    if max_version is not None and version >= max_version:
+        logging.error("NDK {} is too recent for {}.".format(version, source) +
+                      " First KO version is {}".format(max_version))
+        sys.exit(1)
+    return version
+
+
+_NDK_VERSION = None
+
+
+def _init():
+    global _NDK_VERSION
+    if _NDK_VERSION is None:
+        _NDK_VERSION = _get_ndk_version(min_version=_ndk_version(14, 1),
+                                        max_version=_ndk_version(19, 0))
+        logging.info("Installed NDK version: {}".format(_NDK_VERSION))
+
+
+def check_ndk_version(min_version=None, max_version=None):
+    _init()
+    minv = _ndk_version(min_version) if min_version else None
+    maxv = _ndk_version(max_version) if max_version else None
+    _get_ndk_version(minv, maxv, source="product")
 
 
 def setup_argparse(parser):
@@ -185,6 +286,7 @@ def _ndk_build(calldir, module, abis, extra_args, ignore_failure=False):
 
 def add_ndk_build_task(*, calldir="", module="", abis=[], extra_args=[],
                        ignore_failure=False, **kwargs):
+    _init()
     if dragon.OPTIONS.android_abis:
         abis = dragon.OPTIONS.android_abis
     dragon.add_meta_task(
@@ -218,6 +320,7 @@ def _gradle(calldir, abis, extra_args):
 
 
 def add_gradle_task(*, calldir, target="", abis=[], extra_args=[], **kwargs):
+    _init()
     if dragon.OPTIONS.android_abis:
         abis = dragon.OPTIONS.android_abis
     _args = [target]
@@ -250,6 +353,7 @@ def _hook_alchemy_genproject_android(task, args, abi):
 
 
 def add_task_build_common(android_abis, default_abi=None):
+    _init()
     if dragon.OPTIONS.android_abis:
         android_abis = dragon.OPTIONS.android_abis
 
@@ -356,7 +460,7 @@ def _make_hook_images(symbols_path, apps, def_abi):
 
 def add_release_task(symbols_path, apps, default_abi, *,
                      extra_tasks=[], build_task='build'):
-
+    _init()
     if dragon.OPTIONS.android_abis:
         default_abi = dragon.OPTIONS.android_abis[0]
 
