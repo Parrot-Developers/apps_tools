@@ -118,6 +118,7 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, bundle_id,
     cmd += " ALCHEMY_PRODUCT=%s" % dragon.PRODUCT
     if bundle_id:
         cmd += " APP_BUNDLE_IDENTIFIER=%s" % bundle_id
+        cmd += " PRODUCT_BUNDLE_IDENTIFIER=%s" % bundle_id
     if team_id:
         cmd += " DEVELOPMENT_TEAM=%s" % team_id
     cmd += " APP_VERSION_SHORT=%s" % vname
