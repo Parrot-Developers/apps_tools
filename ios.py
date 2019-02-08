@@ -10,7 +10,7 @@ import collections
 
 def _get_version_code_from_name(version_name):
     if version_name == "0.0.0" or version_name.startswith("0.0.0-"):
-        return "0"
+        return "1"
     if not re.match(r"[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}" +
                     r"(-(alpha|beta|rc)+[0-9]{0,2})?$",
                     version_name, flags=re.IGNORECASE):
