@@ -98,8 +98,7 @@ _NDK_VERSION = None
 def _init():
     global _NDK_VERSION
     if _NDK_VERSION is None:
-        _NDK_VERSION = _get_ndk_version(min_version=_ndk_version(14, 1),
-                                        max_version=_ndk_version(19, 0))
+        _NDK_VERSION = _get_ndk_version()
         logging.info("Installed NDK version: {}".format(_NDK_VERSION))
 
 
@@ -115,7 +114,6 @@ def setup_argparse(parser):
                         dest="android_abis",
                         nargs="+",
                         choices=("armeabi", "armeabi-v7a", "arm64-v8a",
-                                 "mips", "mips64",
                                  "x86", "x86_64"),
                         help="Select which android ABIS to build")
 
