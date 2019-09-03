@@ -7,6 +7,8 @@ import dragon
 import shutil
 import sys
 
+import apps_tools.common as common
+
 
 class _ndk_version:
     def __init__(self, name, minor=0):
@@ -121,43 +123,6 @@ def setup_argparse(parser):
 def _setup_android_abi(task, args, abi):
     task.call_base_pre_hook(args)
     task.extra_env["ANDROID_ABI"] = abi
-
-
-def _get_version_code_from_name(version_name):
-    if version_name == "0.0.0" or version_name.startswith("0.0.0-"):
-        return "1"
-    if not re.match(r"[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}" +
-                    r"(-(alpha|beta|rc)+[0-9]{0,2})?$",
-                    version_name, flags=re.IGNORECASE):
-        raise ValueError("Bad version name : " + version_name)
-
-    try:
-        (version, variant) = version_name.split("-")
-    except ValueError:
-        version = version_name
-        variant = "release"
-    (major, minor, rev) = (int(x) for x in version.split("."))
-
-    try:
-        variant_num = int(variant.strip(string.ascii_letters))
-    except ValueError:
-        variant_num = 0
-    variant_name = variant.strip(string.digits)
-
-    variant_codes = {
-        "alpha": 0,
-        "beta": 1,
-        "rc": 2,
-        "release": 3,
-    }
-    try:
-        variant_code = variant_codes[variant_name]
-    except KeyError:
-        variant_code = 0
-
-    code = "{:02d}{:02d}{:02d}{:01d}{:02d}".format(major, minor, rev,
-                                                   variant_code, variant_num)
-    return code.lstrip("0")
 
 # Address sanitizer setup/cleanup
 
@@ -302,7 +267,7 @@ def add_ndk_build_task(*, calldir="", module="", abis=[], extra_args=[],
 def _gradle(calldir, abis, extra_args):
     version = dragon.PARROT_BUILD_PROP_VERSION
     vname, _, suffix = version.partition('-')
-    vcode = _get_version_code_from_name(version)
+    vcode = common.get_version_code(dragon.PARROT_BUILD_VERSION)
 
     cmd = "./gradlew"
     if os.environ.get("MOVE_APPSDATA_IN_OUTDIR"):
