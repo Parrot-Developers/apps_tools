@@ -236,6 +236,7 @@ def _add_android_abi(abi, asan=False):
         posthook=lambda task, args: asan_build_func(abi),
         weak=True,
         outsubdir=abi,
+        host_in_subdir=False,
         secondary_help=True
     )
 
@@ -249,6 +250,7 @@ def _add_android_abi(abi, asan=False):
         posthook=lambda task, args: _asan_clean(abi),
         weak=True,
         outsubdir=abi,
+        host_in_subdir=False,
         secondary_help=True
     )
 
@@ -379,7 +381,8 @@ def add_task_build_common(android_abis, default_abi=None):
                                      prehook=lambda task, args:
                                      _setup_android_abi(task, args,
                                                         default_abi),
-                                     outsubdir=default_abi)
+                                     outsubdir=default_abi,
+                                     host_in_subdir=False)
 
     # Override genproject tasks
     gen_tasks = {
