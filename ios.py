@@ -19,7 +19,9 @@ def _xctool(calldir, workspace, configuration, scheme,
             action, reporter, extra_args):
     cmd = "xctool"
     if (dragon.VARIANT == "ios_sim"):
-        cmd += " --sdk iphonesimulator --arch x86_64"
+        cmd += " --sdk iphonesimulator"
+        if not any("destination" in arg for arg in extra_args):
+            cmd += " --arch x86_64"
     else:
         cmd += " --sdk iphoneos "
     cmd += " --workspace %s" % workspace
@@ -73,7 +75,9 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, bundle_id,
 
     cmd = "xcodebuild"
     if (dragon.VARIANT == "ios_sim"):
-        cmd += " -sdk iphonesimulator -arch x86_64"
+        cmd += " -sdk iphonesimulator"
+        if not any("destination" in arg for arg in extra_args):
+            cmd += " -arch x86_64"
     else:
         cmd += " -sdk iphoneos"
     if workspace.endswith("xcworkspace"):
