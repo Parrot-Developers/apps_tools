@@ -270,6 +270,7 @@ def _gradle(calldir, abis, extra_args):
     version_release.type = dragon.Version.TYPE_RELEASE
     version_release.custom = None
     version_release.custom_number = 0
+    version_release.type_string = None
 
     # appVersionName is the name of the pure release version
     vname = str(version_release)

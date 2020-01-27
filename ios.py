@@ -58,6 +58,7 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, bundle_id,
     version_release.type = dragon.Version.TYPE_RELEASE
     version_release.custom = None
     version_release.custom_number = 0
+    version_release.type_string = None
 
     # vshort is the name of the pure release version
     vshort = str(version_release)
