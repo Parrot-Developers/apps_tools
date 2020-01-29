@@ -1,5 +1,6 @@
 # base to build an Android application
 import os
+import glob
 import logging
 import re
 import string
@@ -126,11 +127,6 @@ def _setup_android_abi(task, args, abi):
 
 
 def _gen_asan_wrapper(abi, lib_dir, script_dir):
-    wrap_template = """#!/system/bin/sh
-HERE="$(cd "$(dirname "$0")" && pwd)"
-export ASAN_OPTIONS=log_to_syslog=false,allow_user_segv_handler=1
-export LD_PRELOAD=$HERE/libclang_rt.asan-{}-android.so
-$@"""
     abi_filter = {
         'arm64-v8a': 'aarch64',
         'armeabi': 'arm',
@@ -143,26 +139,29 @@ $@"""
     os.makedirs(lib_dir, exist_ok=True)
     os.makedirs(script_dir, exist_ok=True)
 
-    asan_lib_fname = "libclang_rt.asan-{}-android.so".format(abi)
-    clang_path = os.path.join(dragon.OUT_DIR, raw_abi, "toolchain",
-                              "lib64", "clang")
-    if not os.path.isdir(clang_path):
-        logging.info("Unable to find clang path while setting asan_wrapper")
+    ndk_path = os.environ.get('ANDROID_NDK_PATH')
+    if not ndk_path:
+        logging.info('Unable to find ANDROID_NDK_PATH')
         return
 
-    clang_versions = os.listdir(path=clang_path)
-    if not clang_versions:
-        logging.info("Unable to get clang version while setting asan_wrapper")
+    if _NDK_VERSION < _ndk_version('r21'):
+        # Pre r21, use asan.<abi>.sh script
+        wrap_sh_name = 'asan.{}.sh'.format(raw_abi)
+    else:
+        # Post r21, use asan.sh script
+        wrap_sh_name = 'asan.sh'
+    wrap_sh_path = os.path.join(ndk_path, 'wrap.sh', wrap_sh_name)
+    shutil.copyfile(wrap_sh_path, os.path.join(script_dir, 'wrap.sh'))
+
+    asan_lib_fname = 'libclang_rt.asan-{}-android.so'.format(abi)
+    asan_libs = glob.glob(os.path.join(ndk_path, 'toolchains', 'llvm',
+                                       'prebuilt', '*', 'lib64', 'clang', '*',
+                                       'lib', 'linux', asan_lib_fname))
+    if not asan_libs:
+        logging.info('Unable to find asan library while setting asan_wrapper')
         return
-
-    cc_version = clang_versions[0]
-    asan_lib_path = os.path.join(clang_path, cc_version, "lib",
-                                 "linux", asan_lib_fname)
-
+    asan_lib_path = asan_libs[0]
     shutil.copyfile(asan_lib_path, os.path.join(lib_dir, asan_lib_fname))
-
-    with open(os.path.join(script_dir, "wrap.sh"), "w") as f:
-        f.write(wrap_template.format(abi))
 
 
 def _asan_setup(abi):
