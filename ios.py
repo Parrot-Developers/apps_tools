@@ -2,8 +2,6 @@
 import os
 import dragon
 import shutil
-import re
-import string
 import tarfile
 import collections
 
@@ -11,33 +9,33 @@ import apps_tools.common as common
 
 
 def _set_product():
-    with open(os.path.join(dragon.OUT_ROOT_DIR, "product.xcconfig"), "w") as f:
-        f.write("ALCHEMY_PRODUCT = %s\n" % dragon.PRODUCT)
+    with open(os.path.join(dragon.OUT_ROOT_DIR, 'product.xcconfig'), 'w') as f:
+        f.write('ALCHEMY_PRODUCT = {}\n'.format(dragon.PRODUCT))
 
 
 def _xctool(calldir, workspace, configuration, scheme,
             action, reporter, extra_args):
-    cmd = "xctool"
-    if (dragon.VARIANT == "ios_sim"):
-        cmd += " --sdk iphonesimulator"
-        if not any("destination" in arg for arg in extra_args):
-            cmd += " --arch x86_64"
+    cmd = ['xctool']
+    if (dragon.VARIANT == 'ios_sim'):
+        cmd.append('--sdk iphonesimulator')
+        if not any('destination' in arg for arg in extra_args):
+            cmd.append('--arch x86_64')
     else:
-        cmd += " --sdk iphoneos "
-    cmd += " --workspace %s" % workspace
-    cmd += " --configuration %s" % configuration
-    cmd += " --scheme %s" % scheme
-    cmd += " --reporter pretty"
+        cmd.append('--sdk iphoneos')
+    cmd.append('--workspace {}'.format(workspace))
+    cmd.append('--configuration {}'.format(configuration))
+    cmd.append('--scheme {}'.format(scheme))
+    cmd.append('--reporter pretty')
     if (reporter):
-        cmd += " --reporter %s" % reporter
-    cmd += " %s " % action
-    cmd += " ".join(extra_args)
-    dragon.exec_cmd(cmd, cwd=calldir)
+        cmd.append('--reporter {}'.format(reporter))
+    cmd.append(action)
+    cmd.extend(extra_args)
+    dragon.exec_cmd(' '.join(cmd), cwd=calldir)
 
 
-def add_xctool_task(calldir="", workspace="", configuration="",
-                    scheme="", action="", reporter=None, extra_args=[],
-                    name="", desc="", subtasks=[]):
+def add_xctool_task(calldir='', workspace='', configuration='',
+                    scheme='', action='', reporter=None, extra_args=[],
+                    name='', desc='', subtasks=[]):
     dragon.add_meta_task(
         name=name,
         desc=desc,
@@ -74,46 +72,46 @@ def _xcodebuild(calldir, workspace, configuration, scheme, action, bundle_id,
     else:
         asan = True
 
-    cmd = "xcodebuild"
-    if (dragon.VARIANT == "ios_sim"):
-        cmd += " -sdk iphonesimulator"
-        if not any("destination" in arg for arg in extra_args):
-            cmd += " -arch x86_64"
+    cmd = ['xcodebuild']
+    if (dragon.VARIANT == 'ios_sim'):
+        cmd.append('-sdk iphonesimulator')
+        if not any('destination' in arg for arg in extra_args):
+            cmd.append('-arch x86_64')
     else:
-        cmd += " -sdk iphoneos"
-    if workspace.endswith("xcworkspace"):
-        cmd += " -workspace %s" % workspace
+        cmd.append('-sdk iphoneos')
+    if workspace.endswith('xcworkspace'):
+        cmd.append('-workspace {}'.format(workspace))
     else:
-        cmd += " -project %s" % workspace
-    cmd += " -configuration %s" % configuration
-    cmd += " -scheme %s" % scheme
-    cmd += " -allowProvisioningUpdates"
-    if os.environ.get("MOVE_APPSDATA_IN_OUTDIR"):
-        cmd += " -derivedDataPath %s" % os.path.join(
-            dragon.OUT_DIR, "xcodeDerivedData")
+        cmd.append('-project {}'.format(workspace))
+    cmd.append('-configuration {}'.format(configuration))
+    cmd.append('-scheme {}'.format(scheme))
+    cmd.append('-allowProvisioningUpdates')
+    if os.environ.get('MOVE_APPSDATA_IN_OUTDIR'):
+        cmd.append('-derivedDataPath {}'.format(os.path.join(
+            dragon.OUT_DIR, 'xcodeDerivedData')))
     if asan:
-        cmd += " -enableAddressSanitizer YES"
-    cmd += " %s" % action
-    cmd += " ALCHEMY_OUT=%s" % dragon.OUT_DIR
-    cmd += " ALCHEMY_OUT_ROOT=%s" % dragon.OUT_ROOT_DIR
-    cmd += " ALCHEMY_PRODUCT=%s" % dragon.PRODUCT
+        cmd.append('-enableAddressSanitizer YES')
+    cmd.append(action)
+    cmd.append('ALCHEMY_OUT={}'.format(dragon.OUT_DIR))
+    cmd.append('ALCHEMY_OUT_ROOT={}'.format(dragon.OUT_ROOT_DIR))
+    cmd.append('ALCHEMY_PRODUCT={}'.format(dragon.PRODUCT))
     if bundle_id:
-        cmd += " APP_BUNDLE_IDENTIFIER=%s" % bundle_id
-        cmd += " PRODUCT_BUNDLE_IDENTIFIER=%s" % bundle_id
+        cmd.append('APP_BUNDLE_IDENTIFIER={}'.format(bundle_id))
+        cmd.append('PRODUCT_BUNDLE_IDENTIFIER={}'.format(bundle_id))
     if team_id:
-        cmd += " DEVELOPMENT_TEAM=%s" % team_id
-    cmd += " APP_VERSION_SHORT=%s" % vshort
-    cmd += " APP_VERSION_LONG=%s" % vlong
-    cmd += " APP_VERSION=%s" % (vshort if short_version else vlong)
-    cmd += " APP_BUILD=%s " % vcode
-    cmd += " ".join(extra_args)
-    if not dragon.OPTIONS.verbose and shutil.which("xcpretty"):
-        cmd += " | xcpretty && exit ${PIPESTATUS[0]}"
-    dragon.exec_cmd(cmd, cwd=calldir)
+        cmd.append('DEVELOPMENT_TEAM={}'.format(team_id))
+    cmd.append('APP_VERSION_SHORT={}'.format(vshort))
+    cmd.append('APP_VERSION_LONG={}'.format(vlong))
+    cmd.append('APP_VERSION={}'.format(vshort if short_version else vlong))
+    cmd.append('APP_BUILD={}'.format(vcode))
+    cmd.extend(extra_args)
+    if not dragon.OPTIONS.verbose and shutil.which('xcpretty'):
+        cmd.append('| xcpretty && exit ${PIPESTATUS[0]}')
+    dragon.exec_cmd(' '.join(cmd), cwd=calldir)
 
 
-def add_xcodebuild_task(*, calldir="", workspace="", configuration="",
-                        scheme="", action="", bundle_id=None, team_id=None,
+def add_xcodebuild_task(*, calldir='', workspace='', configuration='',
+                        scheme='', action='', bundle_id=None, team_id=None,
                         extra_args=[], short_version=False, **kwargs):
     dragon.add_meta_task(
         posthook=lambda task, args: _xcodebuild(calldir, workspace,
@@ -125,15 +123,15 @@ def add_xcodebuild_task(*, calldir="", workspace="", configuration="",
 
 
 def _jazzy(calldir, scheme, extra_args):
-    cmd = "jazzy"
-    cmd += " -x -scheme,%s" % scheme
-    outdir = os.path.join(dragon.OUT_DIR, "docs")
-    cmd += " -o %s " % outdir
-    cmd += " ".join(extra_args)
-    dragon.exec_cmd(cmd, cwd=calldir)
+    cmd = ['jazzy']
+    cmd.append('-x -scheme,{}'.format(scheme))
+    outdir = os.path.join(dragon.OUT_DIR, 'docs')
+    cmd.append('-o {}'.format(outdir))
+    cmd.extend(extra_args)
+    dragon.exec_cmd(' '.join(cmd), cwd=calldir)
 
 
-def add_jazzy_task(*, calldir="", scheme="", extra_args=[], **kwargs):
+def add_jazzy_task(*, calldir='', scheme='', extra_args=[], **kwargs):
     dragon.add_meta_task(
         posthook=lambda task, args: _jazzy(calldir, scheme, extra_args),
         **kwargs
@@ -142,22 +140,22 @@ def add_jazzy_task(*, calldir="", scheme="", extra_args=[], **kwargs):
 
 def add_task_build_common():
     dragon.add_alchemy_task(
-        name="build-common",
-        desc="Build ios common code",
+        name='build-common',
+        desc='Build ios common code',
         product=dragon.PRODUCT,
         variant=dragon.VARIANT,
-        defargs=["all", "sdk"],
+        defargs=['all', 'sdk'],
         weak=True,
         posthook=lambda task, args: _set_product(),
         secondary_help=True
     )
 
     dragon.add_alchemy_task(
-        name="clean-common",
-        desc="Clean ios common code",
+        name='clean-common',
+        desc='Clean ios common code',
         product=dragon.PRODUCT,
         variant=dragon.VARIANT,
-        defargs=["clobber"],
+        defargs=['clobber'],
         weak=True,
         secondary_help=True
     )
@@ -185,8 +183,8 @@ _inhouse_plist_template = """
 
 
 def _create_export_plist(signing_infos, bundle_id):
-    plist_name = os.path.join(dragon.OUT_DIR, "export.plist")
-    with open(plist_name, "w") as f:
+    plist_name = os.path.join(dragon.OUT_DIR, 'export.plist')
+    with open(plist_name, 'w') as f:
         template = _inhouse_plist_template
         f.write(template.format(signing_infos.team_id,
                                 bundle_id, signing_infos.profile))
@@ -199,25 +197,25 @@ def _export_archive(dirpath, archive_path, app):
         return None
 
     export_plist = _create_export_plist(signing_infos, app.bundle_id)
-    ipa_path = os.path.join(dragon.OUT_DIR, "xcodeApps", "temp")
-    ipa_out_path = os.path.join(dragon.OUT_DIR, "xcodeApps", "inhouse")
-    cmd = "xcodebuild -exportArchive -archivePath {} -exportOptionsPlist {} " \
-          "-allowProvisioningUpdates -exportPath {}".format(archive_path,
+    ipa_path = os.path.join(dragon.OUT_DIR, 'xcodeApps', 'temp')
+    ipa_out_path = os.path.join(dragon.OUT_DIR, 'xcodeApps', 'inhouse')
+    cmd = 'xcodebuild -exportArchive -archivePath {} -exportOptionsPlist {} ' \
+          '-allowProvisioningUpdates -exportPath {}'.format(archive_path,
                                                             export_plist,
                                                             ipa_path)
     dragon.exec_cmd(cwd=dirpath, cmd=cmd)
-    ipa_raw_path = "{}/{}.ipa".format(ipa_path, app.scheme)
+    ipa_raw_path = '{}/{}.ipa'.format(ipa_path, app.scheme)
     os.makedirs(ipa_out_path, exist_ok=True)
-    ipa_final_path = "{}/{}".format(ipa_out_path, app.ipa_name)
+    ipa_final_path = '{}/{}'.format(ipa_out_path, app.ipa_name)
     os.rename(ipa_raw_path, ipa_final_path)
     return ipa_final_path
 
 
 def _hook_pre_images(task, args):
     # cleanup
-    dragon.exec_cmd(cwd=dragon.OUT_DIR, cmd="rm -rf images")
-    dragon.exec_cmd(cwd=dragon.OUT_DIR, cmd="rm -rf xcodeApps")
-    manifest_path = os.path.join(dragon.OUT_DIR, "manifest.xml")
+    dragon.exec_cmd(cwd=dragon.OUT_DIR, cmd='rm -rf images')
+    dragon.exec_cmd(cwd=dragon.OUT_DIR, cmd='rm -rf xcodeApps')
+    manifest_path = os.path.join(dragon.OUT_DIR, 'manifest.xml')
     dragon.gen_manifest_xml(manifest_path)
     task.call_base_pre_hook(args)
 
@@ -242,36 +240,36 @@ class App:
         self.short_version = use_short_version
         if display_name:
             self.name = display_name
-            self.ipa_name = "{}.ipa".format(display_name)
+            self.ipa_name = '{}.ipa'.format(display_name)
         else:
             if App._app_id > 0:
-                self.name = "{}-{}-{}".format(self.scheme,
+                self.name = '{}-{}-{}'.format(self.scheme,
                                               self.configuration,
                                               App._app_id)
-                self.ipa_name = "{}-{}-inhouse.ipa".format(self.scheme,
+                self.ipa_name = '{}-{}-inhouse.ipa'.format(self.scheme,
                                                            App._app_id)
             else:
-                self.name = "{}-{}".format(self.scheme, self.configuration)
-                self.ipa_name = "{}-inhouse.ipa".format(self.scheme)
+                self.name = '{}-{}'.format(self.scheme, self.configuration)
+                self.ipa_name = '{}-inhouse.ipa'.format(self.scheme)
             App._app_id += 1
 
     def _archivePath(self, out, skipExt=False):
-        path = os.path.join(out, "xcodeArchives", self.name)
+        path = os.path.join(out, 'xcodeArchives', self.name)
         if skipExt:
             return path
-        return "{}{}".format(path, ".xcarchive")
+        return '{}{}'.format(path, '.xcarchive')
 
     def _taskName(self):
-        return "build-archive-{}".format(self.name)
+        return 'build-archive-{}'.format(self.name)
 
     def _taskDesc(self):
-        return "build archive {} for release".format(self.name)
+        return 'build archive {} for release'.format(self.name)
 
 
 def _make_hook_images(calldir, apps):
     def _hook_images(task, args):
 
-        images_dir = os.path.join(dragon.OUT_DIR, "images")
+        images_dir = os.path.join(dragon.OUT_DIR, 'images')
         dragon.makedirs(images_dir)
 
         for app in apps:
@@ -281,10 +279,10 @@ def _make_hook_images(calldir, apps):
             archive_name = os.path.basename(archive_path)
             tarname = os.path.join(
                 images_dir,
-                "{}.tar.gz".format(os.path.basename(archive_path)))
+                '{}.tar.gz'.format(os.path.basename(archive_path)))
             cwd = os.getcwd()
             os.chdir(archive_dir)
-            tar = tarfile.open(tarname, "w:gz")
+            tar = tarfile.open(tarname, 'w:gz')
             tar.add(archive_name)
             tar.close()
             os.chdir(cwd)
@@ -295,13 +293,14 @@ def _make_hook_images(calldir, apps):
             # Link .ipa
             if inhouse_path:
                 dragon.exec_cmd(cwd=images_dir,
-                                cmd="ln -s {} {}".format(inhouse_path,
+                                cmd='ln -s {} {}'.format(inhouse_path,
                                                          app.ipa_name))
 
         # build.prop
-        build_prop_file = os.path.join(dragon.OUT_DIR, "staging", "etc",
-                                       "build.prop")
-        dragon.exec_cmd(cwd=dragon.OUT_DIR, cmd="cp %s ." % build_prop_file)
+        build_prop_file = os.path.join(dragon.OUT_DIR, 'staging', 'etc',
+                                       'build.prop')
+        dragon.exec_cmd(cwd=dragon.OUT_DIR,
+                        cmd='cp {} .'.format(build_prop_file))
 
         # next hooks
         task.call_base_exec_hook(args)
@@ -314,12 +313,12 @@ def _make_rm_previous_archive(app):
     return _rm_previous_archive
 
 
-def add_release_task(*, calldir="", workspace="", apps=[], extra_tasks=[],
+def add_release_task(*, calldir='', workspace='', apps=[], extra_tasks=[],
                      build_common_task='build-common'):
     subtasks = []
     for app in apps:
         _args = [
-            "-archivePath {}".format(app._archivePath(dragon.OUT_DIR,
+            '-archivePath {}'.format(app._archivePath(dragon.OUT_DIR,
                                                       skipExt=True)),
         ]
         if app.args:
@@ -335,7 +334,7 @@ def add_release_task(*, calldir="", workspace="", apps=[], extra_tasks=[],
             configuration=app.configuration,
             scheme=app.scheme,
             bundle_id=app.bundle_id,
-            action="archive",
+            action='archive',
             team_id=app.build_team_id,
             extra_args=_args,
             secondary_help=True,
@@ -344,16 +343,16 @@ def add_release_task(*, calldir="", workspace="", apps=[], extra_tasks=[],
         subtasks.append(app._taskName())
 
     dragon.override_meta_task(
-        name="images-all",
+        name='images-all',
         prehook=_hook_pre_images,
         exechook=_make_hook_images(calldir, apps)
     )
 
-    subtasks.append("images-all")
+    subtasks.append('images-all')
     subtasks.extend(extra_tasks)
-    subtasks.append("gen-release-archive")
+    subtasks.append('gen-release-archive')
 
     dragon.override_meta_task(
-        name="release",
+        name='release',
         subtasks=subtasks
     )
